@@ -32,8 +32,13 @@ server.on("upgrade" , (req , socket , head) => {
 
     //Check the whole specefication
     if (METHODS.websocketHeadersRulesCheck(socket , upgradeHeaderCheck , connectionHeaderCheck, methodCheck , originCheck)) {
-        METHODS.upgradeConnection(req , socket , head);
-    } 
-    
+        const responseHeaders = METHODS.upgradeHeaders(req);
+        socket.write(responseHeaders);
+        console.log("Websocket Handshake Established Successfully.");
+        //lets start communicate.
+        startWebSocketCommunication(socket);
+    }
 
-})
+});
+
+function startWebSocketCommunication(socket) {};

@@ -15,7 +15,10 @@ module.exports = {
     ALLOWED_ORIGINS: [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http:localhost:5500",
         "http://127.0.0.1:5500",
+        "ws://127.0.0.1:8080",
         "null" // This allow me to use the file protocol to view my html and establish a ws connection.
     ],
+    GUID: "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
 };

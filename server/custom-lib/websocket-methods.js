@@ -1,3 +1,4 @@
+const crypto = require("node:crypto");
 const CONSTANTS = require("./websocket-constants"); 
 
 function isOriginAllowed(origin) {
@@ -23,12 +24,30 @@ function websocketHeadersRulesCheck(socket , upgradeHeaderCheck , connectionHead
     return true;
 };
 
-function upgradeConnection(req , socket , head) {
+function generateKey(secWebsocketKey) {
+    //Concat client-key with guid to generate server accept key.
+    const combinedKey = secWebsocketKey + CONSTANTS.GUID;
+    const hashObject = crypto.createHash("sha1");
+    hashObject.update(combinedKey);
+    let serverKey = hashObject.digest("base64");
+    return serverKey;
+};
 
+function upgradeHeaders(req) {
+    const secWebsocketKey = req.headers["sec-websocket-key"];
+    const serverAcceptKey = generateKey(secWebsocketKey);
+    let headers = [
+        'HTTP/1.1 101 Switching Protocols',
+        'Upgrade: websocket',
+        'Connection: Upgrade',
+        `Sec-WebSocket-Accept: ${serverAcceptKey}`
+    ];
+    const upgradeHeaders = headers.join("\r\n") + "\r\n\r\n";
+    return upgradeHeaders;
 };
 
 module.exports = {
     isOriginAllowed,
     websocketHeadersRulesCheck,
-    upgradeConnection
+    upgradeHeaders
 }
