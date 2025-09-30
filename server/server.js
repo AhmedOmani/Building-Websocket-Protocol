@@ -4,7 +4,8 @@ const CONSTANTS = require("./custom-lib/websocket-constants");
 const METHODS = require("./custom-lib/websocket-methods");
 
 const server = http.createServer((req , res) => {
-    res.end("Hola from potential websocket server\n");
+    console.log(req.headers);
+    res.write("Hola from potential websocket server\n");
 });
 
 server.listen(CONSTANTS.PORT , CONSTANTS.HOST , () => {
@@ -17,4 +18,22 @@ CONSTANTS.CUSTOME_ERRORS.forEach(error => {
         console.log(`My code caught an error event: ${error}.\nLook at the error object` , err);
         process.exit(1);
     });
+});
+
+server.on("upgrade" , (req , socket , head) => {
+    //Grap required request headers.
+    const upgradeHeaderCheck = req.headers["upgrade"].toLowerCase() === CONSTANTS.UPGRADE; // websocket
+    const connectionHeaderCheck = req.headers["connection"].toLowerCase() === CONSTANTS.CONNECTION; // Upgrade
+    const methodCheck = req.method === CONSTANTS.METHOD; // GET
+    
+    //Check origin
+    const origin = req.headers["origin"];
+    const originCheck = METHODS.isOriginAllowed(origin);
+
+    //Check the whole specefication
+    if (METHODS.websocketHeadersRulesCheck(socket , upgradeHeaderCheck , connectionHeaderCheck, methodCheck , originCheck)) {
+        METHODS.upgradeConnection(req , socket , head);
+    } 
+    
+
 })
