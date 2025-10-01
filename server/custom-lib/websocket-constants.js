@@ -21,4 +21,12 @@ module.exports = {
         "null" // This allow me to use the file protocol to view my html and establish a ws connection.
     ],
     GUID: "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
+    //define engine task status.
+    GET_INFO: 1,
+    GET_LENGTH: 2,
+    GET_MASK_KEY: 3,
+    GET_PAYLOAD: 4,
+    SEND_ECHO: 5,
+    //Websocket rules.
+    FIRST_FRAME_SIZE: 2, //size in bytes -> refer to image.png
 };
