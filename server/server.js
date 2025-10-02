@@ -42,7 +42,6 @@ server.on("upgrade" , (req , socket , head) => {
 
 function startWebSocketCommunication(socket) {
     console.log("Websocket Handshake Established Successfully.");
-    console.log(socket);
 
     //Create receiver object to manage the data buffer.
     const receiver = new WebsocketReceiver(socket);
@@ -70,8 +69,10 @@ class WebsocketReceiver {
 
     /** Define methods**/
     processBuffer(chunk) {
+        console.log("chunk: " , chunk);
         this._buffersArray.push(chunk);
         this._bufferedBytesLength += chunk.length;
+        console.log("lenght: " , this._bufferedBytesLength);
         this._startParsingEngine();
     };
 
@@ -89,11 +90,31 @@ class WebsocketReceiver {
     };
 
     _getInfo() {
-        const infoBuffer = this._consumeHeaders(CONSTANTS.FIRST_FRAME_SIZE);   
+        const infoBuffer = this._consumeHeaders(CONSTANTS.FIRST_FRAME_SIZE);  
         console.log(infoBuffer);
+        /*
+            //JUST in case i want to debug and see the binary resprestation of the buffer.
+            const binaryRepresentation = Array.from(infoBuffer)
+            .map(byte => byte.toString(2).padStart(8, "0")) 
+            .join(" "); 
+            console.log("Binary:", binaryRepresentation);
+        */
     };
 
     _consumeHeaders(bytes) {
+        this._bufferedBytesLength -= bytes;
+
+        if (bytes === this._buffersArray[0].length) {
+            return this._buffersArray.shift();
+        }
+
+        if (bytes < this._buffersArray[0].length) {
+            const infoBuffer = this._buffersArray[0];
+            this._buffersArray[0] = this._buffersArray[0].slice(bytes);
+            return infoBuffer.slice(0 , bytes);
+        }
+
+        throw Error("You cannot extrac data from a ws frame that the acual frame size.")
     }
     
 };
