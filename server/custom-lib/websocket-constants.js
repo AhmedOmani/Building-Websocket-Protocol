@@ -29,4 +29,11 @@ module.exports = {
     SEND_ECHO: 5,
     //Websocket rules.
     FIRST_FRAME_SIZE: 2, //size in bytes -> refer to image.png
+
+    // Websocket Payload Fields
+    MEDUIM_FRAME_FLAG: 126,
+    LARGE_FRAME_FLAG: 127,
+    MEDUIM_SIZE_CONSUMPTION: 2,
+    LARGE_SIZE_CONSUMPTION: 8
+
 };
