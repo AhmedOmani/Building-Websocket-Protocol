@@ -72,7 +72,13 @@ class WebsocketReceiver {
     _frameOpcode = null ; // represent the type of receieved data (1 -> TEXT message , 2 -> BINARY message , etc...)
     _isPayloadMasked = false ; // each message from client must be masked, This bit indicate if the message masked or not (boolean value). 
     _initialPayloadLength = 0 ; // indicate to the initial payload length (2 ^ 7 the maximum size of the initial size).
+    _maskKey = Buffer.alloc(CONSTANTS.MASK_LENGTH) ; // maskKey is a key with size of 4 bytes = 2 ^ 32 value.
+
+    //These specially for handling fragmentation
     _acualPayloadLength = 0 ;
+    _maxPayload = 1024 * 1024; // 1MiB
+    _totalPayloadLength = 0;
+    _framesReceived = 0; //Number of frames have been received for send websocker message.
 
     /** Define methods**/
     processBuffer(chunk) {
@@ -90,6 +96,12 @@ class WebsocketReceiver {
                     break;
                 case CONSTANTS.GET_LENGTH: // In this step we extract the acual -not initial- payload length 
                     this._getLength();
+                    break;
+                case CONSTANTS.GET_MASK_KEY: // In this step we know that each message from client is masked , so we need to extract the mask key.
+                    this._getMaskKey();
+                    break;
+                case CONSTANTS.GET_PAYLOAD:
+                    this._getPayload();
                     break;
             }
 
@@ -125,7 +137,8 @@ class WebsocketReceiver {
             throw new Error("The messeage sent from client is not MASKED!");
         }
         // LETS MOVE TO THE NEXT STEP OF PARSING 
-        this._parserState = CONSTANTS.GET_LENGTH
+        this._parserState = CONSTANTS.GET_LENGTH;
+        console.log(this._bufferedChunks);
 
     };
 
@@ -134,7 +147,8 @@ class WebsocketReceiver {
         // We dont do anything in this case because in that case the payload is considered small and the acual length already sent and extracted.
         if (this._initialPayloadLength < CONSTANTS.MEDUIM_FRAME_FLAG) {
             this._acualPayloadLength = this._initialPayloadLength;
-            this.processLength();
+            this._processLength();
+            console.log(this._bufferedChunks);
             return;
         }
 
@@ -142,7 +156,7 @@ class WebsocketReceiver {
             let payloadLengthBuffer = this._consumeHeaders(CONSTANTS.MEDUIM_SIZE_CONSUMPTION); // consume next 2 bytes
             console.log("BOFER: " , payloadLengthBuffer);
             this._acualPayloadLength = payloadLengthBuffer.readUInt16BE(); 
-            this.processLength() // TODO
+            this._processLength()
             console.log("Holaaaaa" , this._acualPayloadLength);
         }
         
@@ -152,15 +166,36 @@ class WebsocketReceiver {
             //In this case we will have such a big number the js number system cant handle , so we must deal with it as a BigInt number .
             let buf8BigInt = payloadLengthBuffer.readUInt64BE();
             this._acualPayloadLength = Number(buf8BigInt);
-            this.processLength() // TODO
+            this._processLength() 
         }
         
+    }
+
+    _getMaskKey() {
+        this._maskKey = this._consumeHeaders(CONSTANTS.MASK_LENGTH) ;
+        this._parserState = CONSTANTS.GET_PAYLOAD;
+    }
+
+    // The big trouble here is the payload itself maybe sent on different fragments , that mean we want to wait until all fragments received 
+    // so this function -getPayload- will just do its logic when it make sure that total bytes on buffer are greater that the acualPayloadLength 
+    // AKA waiting for another data events fired.
+    _getPayload() {
+        // in this case we will stop the parser engine and wait for another data event
+        if (this._totalBufferedLength < this._acualPayloadLength) {
+            this._shouldContinueParsing = false;
+            return ;
+        }
+
+        this._framesReceived += 1 ;
+
+        let fullMaskedPayloadBuffer = this._consumePayload(this._acualPayloadLength);
+
     }
 
     //Helper functions.
     _consumeHeaders(bytes) {
         this._totalBufferedLength -= bytes;
-
+        
         if (bytes === this._bufferedChunks[0].length) {
             return this._bufferedChunks.shift();
         }
@@ -172,6 +207,38 @@ class WebsocketReceiver {
         }
 
         throw Error("You cannot extrac data from a ws frame that the acual frame size.")
+    }
+
+    _consumePayload(bytes) {
+    
+        this._totalBufferedLength -= bytes;
+        const payloadBuffer = Buffer.alloc(bytes);
+
+        let totalBytesRead = 0 ;
+
+        while(totalBytesRead < bytes) {
+            const curBuffer = this._bufferedChunks[0];
+            const bytesToRead = Math.min(bytes - totalBytesRead , curBuffer.length);
+            curBuffer.copy(payloadBuffer ,  totalBytesRead , 0 , bytesToRead)
+            
+            //maitain the main buffer , erase the whole buffer if we read all of it , if not just the erase the read chunk .
+            if (bytesToRead === curBuffer.length) this._bufferedChunks.shift();
+            else this._bufferedChunks[0] = curBuffer.slice(bytesToRead);
+            
+            totalBytesRead += bytesToRead ;
+        }
+
+        return payloadBuffer;
+
+    }
+
+    _processLength () {
+        this._totalPayloadLength += this._acualPayloadLength;
+        if (this._totalPayloadLength > this._maxPayload) {
+            throw new Error("Data is too large");
+        }
+        //Lets move to the next task.
+        this._parserState = CONSTANTS.GET_MASK_KEY;
     }
     
 };
