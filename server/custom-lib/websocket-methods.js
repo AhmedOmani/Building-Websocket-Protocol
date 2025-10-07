@@ -46,8 +46,17 @@ function upgradeHeaders(req) {
     return upgradeHeaders;
 };
 
+
+function unmaskPayload(payloadBuffer , maskKey) {
+    for (let i = 0; i < payloadBuffer.length ; i++) {
+        payloadBuffer[i] = payloadBuffer[i] ^ maskKey[i % 4];
+    }
+    return payloadBuffer;
+};
+
 module.exports = {
     isOriginAllowed,
     websocketHeadersRulesCheck,
-    upgradeHeaders
+    upgradeHeaders,
+    unmaskPayload
 }

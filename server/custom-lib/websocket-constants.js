@@ -31,10 +31,19 @@ module.exports = {
     FIRST_FRAME_SIZE: 2, //size in bytes -> refer to image.png
 
     // Websocket Payload Fields
+    MIN_FRAME_SIZE: 2,
     MEDUIM_FRAME_FLAG: 126,
     LARGE_FRAME_FLAG: 127,
     MEDUIM_SIZE_CONSUMPTION: 2,
     LARGE_SIZE_CONSUMPTION: 8,
     MASK_LENGTH: 4,
+
+    // Websocket opcodes
+    OPCODE_TEXT: 0x01,    // text frame
+    OPCODE_BINARY: 0x02,  // binary frame
+    OPCODE_CLOSE: 0x08,   // closure frame
+    OPCODE_PING: 0x09,
+    OPCODE_PONG: 0x0A,
+
 
 };

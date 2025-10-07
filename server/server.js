@@ -4,7 +4,6 @@ const CONSTANTS = require("./custom-lib/websocket-constants");
 const METHODS = require("./custom-lib/websocket-methods");
 
 const server = http.createServer((req , res) => {
-    console.log(req.headers);
     res.write("Hola from potential websocket server\n");
 });
 
@@ -79,6 +78,7 @@ class WebsocketReceiver {
     _maxPayload = 1024 * 1024; // 1MiB
     _totalPayloadLength = 0;
     _framesReceived = 0; //Number of frames have been received for send websocker message.
+    _fragments = [];
 
     /** Define methods**/
     processBuffer(chunk) {
@@ -100,7 +100,7 @@ class WebsocketReceiver {
                 case CONSTANTS.GET_MASK_KEY: // In this step we know that each message from client is masked , so we need to extract the mask key.
                     this._getMaskKey();
                     break;
-                case CONSTANTS.GET_PAYLOAD:
+                case CONSTANTS.GET_PAYLOAD: // In this step finally we get the message and unmask it.
                     this._getPayload();
                     break;
             }
@@ -117,7 +117,12 @@ class WebsocketReceiver {
             .join(" "); 
             console.log("Binary:", binaryRepresentation);
         */
-
+       
+        // minimum size is 2
+        if (this._totalBufferedLength < CONSTANTS.MIN_FRAME_SIZE)  {
+            this._shouldContinueParsing = false;
+            return;
+        }
         const frameHeaderBuffer = this._consumeHeaders(CONSTANTS.FIRST_FRAME_SIZE);  
         const firstByte = frameHeaderBuffer[0] //First byte contains the FIN (1bit) | RSV1 (1bit) | RSV2 (1bit) | RSV3 (1bit) | opcode (4bits) = 8 bits
         const secondByte = frameHeaderBuffer[1] //Second byte contains the Mask (1bit) | InitialPayloadLength (7bits) = 8 bits 
@@ -127,10 +132,12 @@ class WebsocketReceiver {
         this._isPayloadMasked = !!(secondByte & (1 << 7)); // Extracing the last bit of the second byte to know if the message masked or not.
         this._initialPayloadLength = (secondByte & ( (1 << 7) - 1 ));
 
+        /** 
         console.log(this._isFinalFragment);
         console.log(this._frameOpcode);
         console.log(this._isPayloadMasked);
         console.log(this._initialPayloadLength);
+        */
         // if data is not masked throw an error
         if (!this._isPayloadMasked) {
             //TODO: send a close frame back to the client.
@@ -138,7 +145,6 @@ class WebsocketReceiver {
         }
         // LETS MOVE TO THE NEXT STEP OF PARSING 
         this._parserState = CONSTANTS.GET_LENGTH;
-        console.log(this._bufferedChunks);
 
     };
 
@@ -154,17 +160,14 @@ class WebsocketReceiver {
 
         else if (this._initialPayloadLength === CONSTANTS.MEDUIM_FRAME_FLAG) {
             let payloadLengthBuffer = this._consumeHeaders(CONSTANTS.MEDUIM_SIZE_CONSUMPTION); // consume next 2 bytes
-            console.log("BOFER: " , payloadLengthBuffer);
             this._acualPayloadLength = payloadLengthBuffer.readUInt16BE(); 
-            this._processLength()
-            console.log("Holaaaaa" , this._acualPayloadLength);
+            this._processLength();
         }
         
         else if (this._initialPayloadLength === CONSTANTS.LARGE_FRAME_FLAG) {
             let payloadLengthBuffer = this._consumeHeaders(CONSTANTS.LARGE_SIZE_CONSUMPTION); // consume next 8 bytes
-            console.log("BOFER: " , payloadLengthBuffer);
             //In this case we will have such a big number the js number system cant handle , so we must deal with it as a BigInt number .
-            let buf8BigInt = payloadLengthBuffer.readUInt64BE();
+            let buf8BigInt = payloadLengthBuffer.readBigUInt64BE();
             this._acualPayloadLength = Number(buf8BigInt);
             this._processLength() 
         }
@@ -181,6 +184,7 @@ class WebsocketReceiver {
     // AKA waiting for another data events fired.
     _getPayload() {
         // in this case we will stop the parser engine and wait for another data event
+
         if (this._totalBufferedLength < this._acualPayloadLength) {
             this._shouldContinueParsing = false;
             return ;
@@ -189,7 +193,33 @@ class WebsocketReceiver {
         this._framesReceived += 1 ;
 
         let fullMaskedPayloadBuffer = this._consumePayload(this._acualPayloadLength);
+        //unmask the full data
+        let fullUnmaskedPayloadBuffer = METHODS.unmaskPayload(fullMaskedPayloadBuffer , this._maskKey);
+        
+        if (this._frameOpcode === CONSTANTS.OPCODE_CLOSE) {
+            // TODO: Send closure frame
+        }
 
+        if ([CONSTANTS.OPCODE_BINARY , CONSTANTS.OPCODE_PING , CONSTANTS.OPCODE_PONG].includes(this._opcode)) {
+            throw new Error("Server has not dealt with a this type of frame yet!\n");
+        }
+
+
+
+        if (fullUnmaskedPayloadBuffer.length) {
+            this._fragments.push(fullUnmaskedPayloadBuffer);
+        }
+
+        //Check for FIN state is false , go and start the parsing operation form begining, else stop parsing and send data back to client.
+        if (this._isFinalFragment === false) {
+            this._parserState = CONSTANTS.GET_INFO; 
+        } else {
+            console.log("FINAL DEBUG: ");
+            console.log("Total frame received: " , this._framesReceived);
+            console.log("Totola payload message length: ", this._totalPayloadLength);
+            this._shouldContinueParsing = false;
+            // TODO: send data back to the client.
+        }
     }
 
     //Helper functions.
