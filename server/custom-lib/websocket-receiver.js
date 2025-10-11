@@ -49,6 +49,11 @@ class WebsocketReceiver {
                 case CONSTANTS.GET_PAYLOAD: // In this step finally we get the message and unmask it.
                     this._getPayload();
                     break;
+                case CONSTANTS.RESPONSE_MESSAGE:
+                    this._responseMessage();
+                    this._shouldContinueParsing = false;
+                    this._parserState = CONSTANTS.GET_INFO;
+                    break;
             }
 
         } while(this._shouldContinueParsing) ;
@@ -146,11 +151,9 @@ class WebsocketReceiver {
             // TODO: Send closure frame
         }
 
-        if ([CONSTANTS.OPCODE_BINARY , CONSTANTS.OPCODE_PING , CONSTANTS.OPCODE_PONG].includes(this._opcode)) {
+        if ([CONSTANTS.OPCODE_BINARY , CONSTANTS.OPCODE_PING , CONSTANTS.OPCODE_PONG].includes(this._frameOpcode)) {
             throw new Error("Server has not dealt with a this type of frame yet!\n");
         }
-
-
 
         if (fullUnmaskedPayloadBuffer.length) {
             this._fragments.push(fullUnmaskedPayloadBuffer);
@@ -163,9 +166,66 @@ class WebsocketReceiver {
             console.log("FINAL DEBUG: ");
             console.log("Total frame received: " , this._framesReceived);
             console.log("Totola payload message length: ", this._totalPayloadLength);
-            this._shouldContinueParsing = false;
+            this._parserState = CONSTANTS.RESPONSE_MESSAGE;
             // TODO: send data back to the client.
         }
+    }
+
+    _responseMessage() {
+        // the fragments array contain the whole message sent through multiple frames
+        const fullMessage = Buffer.concat(this._fragments); // complete payload 
+        let payloadLength = fullMessage.length;
+        let sizePayloadType ;
+        // we know that websocket protocol categorize the size of payload sent , so we need to determine the number of bytes we need to add to represent the size of payload correctly
+        switch (true) {
+            case (payloadLength <= 125):
+                sizePayloadType = 0; //0 bytes more added
+                break;
+            case (payloadLength <= 65535):
+                sizePayloadType = 2; //2 bytes more added
+                break;
+            default: // 
+                sizePayloadType = 8; //8 bytes more added
+                break;
+        }
+        //the complete buffer frame size is :
+        // the first 2 mandatory bytes (FIN + RSVs + OPCODE + ISMASK + INITIALPAYLOADLENGTH)
+        // the second number bytes determined by the size type
+        // the third number of bytes is the acual payload length 
+        const frame = Buffer.alloc(CONSTANTS.MIN_FRAME_SIZE + sizePayloadType + payloadLength);
+
+        //now populate the HEADERS of frame, starting with first byte
+        let FIN = 0x01;
+        let RSV1 = 0x00;
+        let RSV2 = 0x00;
+        let RSV3 = 0x00;
+        let OPCODE = this._frameOpcode; // Use the same opcode as the received message
+        let firstByte = (FIN << 7) | (RSV1 << 6) | (RSV2 << 5) | (RSV3 << 4) | OPCODE;
+        frame[0] = firstByte;
+        console.log(frame[0].toString(2));
+
+        //lets build the second portion
+        let MASK_BIT = 0x00;
+        
+        if (payloadLength <= 125) {
+            frame[1] = (MASK_BIT | payloadLength);
+        } else if (payloadLength <= 65535) {
+            frame[1] = (MASK_BIT | CONSTANTS.MEDUIM_FRAME_FLAG) ;// 0b00000000 | 0b01111110
+            //NEXT 2 BYTES FOR THE SIZE
+            frame.writeUInt16BE(payloadLength, 2);
+        } else {
+            frame[1] = (MASK_BIT | CONSTANTS.LARGE_FRAME_FLAG); // 0b00000000 | 0b01111111
+            frame.writeBigInt64BE(BigInt(payloadLength), 2);
+        }
+
+        // last but not least is appending fullMessage to the frame buffer
+        const messageStartOffset = CONSTANTS.MIN_FRAME_SIZE + sizePayloadType;
+        fullMessage.copy(frame , messageStartOffset);
+
+        //send the message back to the client
+        this._socket.write(frame);
+        console.log("CLIENT...");
+        this._fragments = [];
     }
 
     //Helper functions.

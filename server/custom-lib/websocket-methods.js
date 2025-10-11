@@ -7,6 +7,7 @@ function isOriginAllowed(origin) {
 
 function websocketHeadersRulesCheck(socket , upgradeHeaderCheck , connectionHeaderCheck , methodCheck , originCheck) {
     const finalCheck = upgradeHeaderCheck && connectionHeaderCheck && methodCheck && originCheck;
+
     if (!finalCheck) {
         const message = "400 Bad Request. The HTTP headers dont comply with the RFC6455 spec.";
         const messageLength = message.length;

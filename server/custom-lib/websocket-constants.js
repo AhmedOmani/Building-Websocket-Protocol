@@ -1,5 +1,5 @@
-const PORT = 3000 ;
-const HOST = "localhost" ;
+const PORT = 3001 ;
+const HOST = "127.0.0.1" ;
 module.exports = {
     PORT,
     HOST,
@@ -10,7 +10,7 @@ module.exports = {
     ],
     METHOD: "GET",
     VERSION: 13 ,
-    CONNECTION: "upgrade",
+    CONNECTION: "Upgrade",
     UPGRADE: "websocket",
     ALLOWED_ORIGINS: [
         "http://localhost:3000",
@@ -26,7 +26,7 @@ module.exports = {
     GET_LENGTH: 2,
     GET_MASK_KEY: 3,
     GET_PAYLOAD: 4,
-    SEND_ECHO: 5,
+    RESPONSE_MESSAGE: 5,
     //Websocket rules.
     FIRST_FRAME_SIZE: 2, //size in bytes -> refer to image.png
 

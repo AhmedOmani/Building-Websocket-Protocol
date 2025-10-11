@@ -6,6 +6,7 @@ const { WebsocketReceiver } = require("./custom-lib/websocket-receiver");
 
 const server = http.createServer((req , res) => {
     res.write("Hola from potential websocket server\n");
+    res.end();
 });
 
 server.listen(CONSTANTS.PORT , CONSTANTS.HOST , () => {
@@ -21,15 +22,21 @@ CONSTANTS.CUSTOME_ERRORS.forEach(error => {
 });
 
 server.on("upgrade" , (req , socket , head) => {
+    console.log("Con:"  , req.headers["connection"] )
     //Grap required request headers.
     const hasWebsocketUpgradeHeader = req.headers["upgrade"].toLowerCase() === CONSTANTS.UPGRADE; // websocket
-    const hasUpgradeConnectionHeader = req.headers["connection"].toLowerCase() === CONSTANTS.CONNECTION; // Upgrade
+    // I do it specifically for compatibility issues in goolge chrome the connection header sent like this
+    // Connection : <Upgrade>
+    // but firefox send the connection header like this:
+    // Connection : <keep alive , Upgrade>
+    // so i need to handle it
+    const ConnectionHeader = req.headers["connection"];
+    const hasUpgradeConnectionHeader = ConnectionHeader.includes(CONSTANTS.CONNECTION);
     const isRequestMethodGet = req.method === CONSTANTS.METHOD; // GET
     
     //Check origin
     const clientOrigin = req.headers["origin"];
     const isOriginAllowed = METHODS.isOriginAllowed(clientOrigin);
-
     //Check the whole specefication
     if (METHODS.websocketHeadersRulesCheck(socket , hasWebsocketUpgradeHeader , hasUpgradeConnectionHeader, isRequestMethodGet , isOriginAllowed)) {
         const responseHeaders = METHODS.upgradeHeaders(req);
