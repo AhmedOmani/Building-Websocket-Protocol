@@ -6,6 +6,7 @@ function isOriginAllowed(origin) {
 };
 
 function websocketHeadersRulesCheck(socket , upgradeHeaderCheck , connectionHeaderCheck , methodCheck , originCheck) {
+   
     const finalCheck = upgradeHeaderCheck && connectionHeaderCheck && methodCheck && originCheck;
 
     if (!finalCheck) {

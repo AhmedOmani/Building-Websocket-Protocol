@@ -15,6 +15,7 @@ class WebsocketReceiver {
     //**Define the frame variables*/
     _isFinalFragment = false ; // responsible for indicating if its the final fragment of a message has been received.
     _frameOpcode = null ; // represent the type of receieved data (1 -> TEXT message , 2 -> BINARY message , etc...)
+    _messageOpcode = null ; // The opcode from the FIRST frame (used when sending response) - CRITICAL for fragmented messages!
     _isPayloadMasked = false ; // each message from client must be masked, This bit indicate if the message masked or not (boolean value). 
     _initialPayloadLength = 0 ; // indicate to the initial payload length (2 ^ 7 the maximum size of the initial size).
     _maskKey = Buffer.alloc(CONSTANTS.MASK_LENGTH) ; // maskKey is a key with size of 4 bytes = 2 ^ 32 value.
@@ -52,7 +53,10 @@ class WebsocketReceiver {
                 case CONSTANTS.RESPONSE_MESSAGE:
                     this._responseMessage();
                     this._shouldContinueParsing = false;
-                    this._parserState = CONSTANTS.GET_INFO;
+                    break;
+                case CONSTANTS.GET_CLOSE_INFO:
+                    this._getCloseInfo();
+                    this._shouldContinueParsing = false;
                     break;
             }
 
@@ -83,17 +87,34 @@ class WebsocketReceiver {
         this._isPayloadMasked = !!(secondByte & (1 << 7)); // Extracing the last bit of the second byte to know if the message masked or not.
         this._initialPayloadLength = (secondByte & ( (1 << 7) - 1 ));
 
+        // Continuation frames have Opcode = 0 , so I need to save the opcode from the first frame only/
+        if (this._frameOpcode !== 0x00) {
+            // This is either a non-fragmented message OR the first frame of a fragmented message
+            this._messageOpcode = this._frameOpcode;
+        }
+
         /** 
         console.log(this._isFinalFragment);
         console.log(this._frameOpcode);
+        console.log(this._messageOpcode);
         console.log(this._isPayloadMasked);
         console.log(this._initialPayloadLength);
         */
-        // if data is not masked throw an error
+        
+        // Validate: data MUST be masked from client
         if (!this._isPayloadMasked) {
-            //TODO: send a close frame back to the client.
-            throw new Error("The messeage sent from client is not MASKED!");
+            this.sendClose(1002, "Client didnt send <Masking key>");
+            this._shouldContinueParsing = false;
+            return;
         }
+
+        // Validate: Check the opcode (our server only handles text/binary data)
+        if ([CONSTANTS.OPCODE_PING, CONSTANTS.OPCODE_PONG].includes(this._frameOpcode)) {
+            this.sendClose(1003, "Server doesnt accept ping or pong");
+            this._shouldContinueParsing = false;
+            return;
+        }
+
         // LETS MOVE TO THE NEXT STEP OF PARSING 
         this._parserState = CONSTANTS.GET_LENGTH;
 
@@ -105,7 +126,6 @@ class WebsocketReceiver {
         if (this._initialPayloadLength < CONSTANTS.MEDUIM_FRAME_FLAG) {
             this._acualPayloadLength = this._initialPayloadLength;
             this._processLength();
-            console.log(this._bufferedChunks);
             return;
         }
 
@@ -142,32 +162,29 @@ class WebsocketReceiver {
         }
 
         this._framesReceived += 1 ;
+        console.log(`[FRAME ${this._framesReceived}] Received: ${this._acualPayloadLength} bytes | FIN: ${this._isFinalFragment ? 'YES (Final)' : 'NO (Continuation)'} | OPCODE: ${this._frameOpcode}`);
 
         let fullMaskedPayloadBuffer = this._consumePayload(this._acualPayloadLength);
         //unmask the full data
         let fullUnmaskedPayloadBuffer = METHODS.unmaskPayload(fullMaskedPayloadBuffer , this._maskKey);
-        
-        if (this._frameOpcode === CONSTANTS.OPCODE_CLOSE) {
-            // TODO: Send closure frame
-        }
-
-        if ([CONSTANTS.OPCODE_BINARY , CONSTANTS.OPCODE_PING , CONSTANTS.OPCODE_PONG].includes(this._frameOpcode)) {
-            throw new Error("Server has not dealt with a this type of frame yet!\n");
-        }
 
         if (fullUnmaskedPayloadBuffer.length) {
             this._fragments.push(fullUnmaskedPayloadBuffer);
+        }
+        
+        if (this._frameOpcode === CONSTANTS.OPCODE_CLOSE) {
+            this._parserState = CONSTANTS.GET_CLOSE_INFO;
+            return;
         }
 
         //Check for FIN state is false , go and start the parsing operation form begining, else stop parsing and send data back to client.
         if (this._isFinalFragment === false) {
             this._parserState = CONSTANTS.GET_INFO; 
         } else {
-            console.log("FINAL DEBUG: ");
-            console.log("Total frame received: " , this._framesReceived);
-            console.log("Totola payload message length: ", this._totalPayloadLength);
+            console.log(`\n[MESSAGE COMPLETE] Total frames: ${this._framesReceived} | Total payload: ${this._totalPayloadLength} bytes`);
+            console.log(`[PROCESSING] Reassembling fragments and preparing echo response...`);
             this._parserState = CONSTANTS.RESPONSE_MESSAGE;
-            // TODO: send data back to the client.
+           
         }
     }
 
@@ -199,10 +216,10 @@ class WebsocketReceiver {
         let RSV1 = 0x00;
         let RSV2 = 0x00;
         let RSV3 = 0x00;
-        let OPCODE = this._frameOpcode; // Use the same opcode as the received message
+        let OPCODE = this._messageOpcode; //Using the very first opcode from the first frame, because continuation frames have opcode = 0.
         let firstByte = (FIN << 7) | (RSV1 << 6) | (RSV2 << 5) | (RSV3 << 4) | OPCODE;
         frame[0] = firstByte;
-        console.log(frame[0].toString(2));
+        console.log(`[SENDING] Echo response: ${payloadLength} bytes | FIN: 1 | OPCODE: ${OPCODE}`);
 
         //lets build the second portion
         let MASK_BIT = 0x00;
@@ -226,32 +243,23 @@ class WebsocketReceiver {
         this._sendFrame(frame);
     }
 
-    _sendFrame(frame) {
-        // Check if socket is still writable
-        if (!this._socket || this._socket.destroyed || !this._socket.writable) {
-            console.log("Socket is not writable, cannot send frame");
-            this.reset();
+    _getCloseInfo() {
+        // control/closed frame cant be fragmanted so we have only one complete frame
+        let closeFramePayload = this._fragments[0];
+        //no body/payload send with close frame
+        if (!closeFramePayload) {
+            this.sendClose(1008 , "Set the status code");
             return;
         }
 
-        // Try to write the frame
-        const canContinue = this._socket.write(frame, (err) => {
-            if (err) {
-                console.error("Error writing frame:", err.message);
-                // Socket error occurred, clean up
-                this.reset();
-                return;
-            }
-            // Write successful, reset for next message
-            console.log("Frame sent successfully");
-            this.reset();
-        });
+        //first 2 bytes contain close code
+        let closeCode = closeFramePayload.readUInt16BE();
+        let closeReason = closeFramePayload.toString("utf-8" , 2);
 
-        // If write buffer is full, we need to wait for drain
-        if (!canContinue) {
-            console.log("Socket buffer full, waiting for drain...");
-            // Note: The callback above will handle reset after drain+write completes
-        }
+        console.log(`Received close frame with code ${closeCode} and reason: ${closeReason}`);
+
+        let serverResponse = `Closing connection...`;
+        this.sendClose(closeCode , serverResponse);
     }
 
     //Helper functions.
@@ -295,12 +303,88 @@ class WebsocketReceiver {
     }
 
     _processLength () {
-        this._totalPayloadLength += this._acualPayloadLength;
-        if (this._totalPayloadLength > this._maxPayload) {
-            throw new Error("Data is too large");
+        // Check if payload exceeds max size BEFORE adding
+        if (this._totalPayloadLength + this._acualPayloadLength > this._maxPayload) {
+            console.log(`[LIMIT EXCEEDED] Message size: ${this._totalPayloadLength + this._acualPayloadLength} bytes | Server limit: ${this._maxPayload} bytes`);
+            this.sendClose(1009, "Payload exceeds 1 MiB limit");
+            this._shouldContinueParsing = false;
+            return;
         }
+        
+        this._totalPayloadLength += this._acualPayloadLength;
+        
+        // Check for empty payload
+        if (this._totalPayloadLength === 0) {
+            console.log("[EMPTY] No payload data");
+            this.sendClose(1000, "Empty message not allowed");
+            this._shouldContinueParsing = false;
+            return;
+        }
+        
         //Lets move to the next task.
         this._parserState = CONSTANTS.GET_MASK_KEY;
+    }
+
+    _sendFrame(frame) {
+        // Check if socket is still writable
+        if (!this._socket || this._socket.destroyed || !this._socket.writable) {
+            console.log("Socket is not writable, cannot send frame");
+            this.reset();
+            return;
+        }
+
+        const canContinue = this._socket.write(frame, (err) => {
+            if (err) {
+                console.error("[ERROR] Failed to send frame:", err.message);
+                this.reset();
+                return;
+            }
+            console.log(`[SUCCESS] Echo sent successfully\n${'='.repeat(60)}\n`);
+            this.reset();
+        });
+
+        // If write buffer is full, we need to wait for drain
+        if (!canContinue) {
+            console.log("[BACKPRESSURE] Socket buffer full, waiting for drain event...");
+        }
+    }
+
+    sendClose(closeCode, closeReason) {
+        // Check if socket is still writable
+        if (!this._socket || this._socket.destroyed || !this._socket.writable) {
+            console.log("[CLOSE] Socket already closed, skipping close frame");
+            this.reset();
+            return;
+        }
+
+        // extract and/or construct the closure code & reason
+        let closureCode = (typeof closeCode !== 'undefined' && closeCode) ? closeCode : 1000;
+        let closureReason = (typeof closeReason !== 'undefined' && closeReason) ? closeReason : "";
+
+        console.log(`[CLOSING] Sending close frame | Code: ${closureCode} | Reason: ${closureReason}`);
+
+        const closureReasonBuffer = Buffer.from(closureReason, 'utf8');
+        const closureReasonLength = closureReasonBuffer.length; 
+
+       
+        const closeFramePayload = Buffer.alloc(2 + closureReasonLength);
+        // write the close code into the payload
+        closeFramePayload.writeInt16BE(closureCode, 0); 
+        closureReasonBuffer.copy(closeFramePayload, 2);
+
+        // final step: create the first byte and second byte, and then create the final frame to send back the client
+        const firstByte = 0b10000000 | 0b00000000 | 0b00001000; // FIN (1) + RSV (0) + OPCODE (8)
+        const secondByte = closeFramePayload.length;
+        const mandatoryCloseHeaders = Buffer.from([firstByte, secondByte]);
+
+        // create the final close frame
+        const closeFrame = Buffer.concat([mandatoryCloseHeaders, closeFramePayload]);
+
+        // send the close frame, and reset the receiver properties
+        this._socket.write(closeFrame);
+        this._socket.end(); // ending the TCP websocket connection in compliance with the RFC (server must be send the FIN -ending signal- first)
+
+        this.reset();
     }
 
     reset() {
@@ -310,7 +394,8 @@ class WebsocketReceiver {
         this._parserState = CONSTANTS.GET_INFO;
         this._shouldContinueParsing = false ;
         this._isFinalFragment = false ; 
-        this._frameOpcode = null ; 
+        this._frameOpcode = null ;
+        this._messageOpcode = null ; // Reset the message opcode for next message
         this._isPayloadMasked = false ; 
         this._initialPayloadLength = 0 ; 
         this._maskKey = Buffer.alloc(CONSTANTS.MASK_LENGTH) ; 

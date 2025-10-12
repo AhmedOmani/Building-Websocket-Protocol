@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Protocol Implementation - Live Demo</title>
+    <link rel="stylesheet" href="demo-styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="hero-content">
+            <div class="badge">RFC 6455 Compliant</div>
+            <h1><i class="fas fa-code-branch"></i> Omani WebSocket Protocol</h1>
+            <p class="subtitle">Built from scratch without external libraries </p>
+            <p class="subtitle">Handles fragmentation</p>
+            <p class="subtitle">Full RFC 6455 compliance</p>
+        </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <div class="dashboard">
+        <!-- Connection Panel -->
+        <section class="panel connection-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-plug"></i> Connection</h2>
+                <div class="status-badge" id="statusBadge">Disconnected</div>
+            </div>
+            <div class="panel-body">
+                <div class="connection-info">
+                    <div class="info-item">
+                        <span class="label">Server:</span>
+                        <span class="value" id="serverUrl">ws://127.0.0.1:3001</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Protocol:</span>
+                        <span class="value">WebSocket (RFC 6455)</span>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button id="connectBtn" class="btn btn-primary">
+                        <i class="fas fa-power-off"></i> Connect
+                    </button>
+                    <button id="disconnectBtn" class="btn btn-danger" disabled>
+                        <i class="fas fa-times"></i> Disconnect
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Panel -->
+        <section class="panel stats-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-chart-line"></i> Real-time Statistics</h2>
+            </div>
+            <div class="panel-body">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-paper-plane"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="messagesSent">0</div>
+                            <div class="stat-label">Messages Sent</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-reply"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="messagesReceived">0</div>
+                            <div class="stat-label">Messages Received</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-database"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="bytesSent">0</div>
+                            <div class="stat-label">Bytes Transferred</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-layer-group"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="framesReceived">0</div>
+                            <div class="stat-label">Frames Received</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Test Panel -->
+        <section class="panel test-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-flask"></i> Message Testing</h2>
+            </div>
+            <div class="panel-body">
+                <div class="test-controls">
+                    <div class="size-selector">
+                        <label>Message Size:</label>
+                        <div class="size-buttons">
+                            <button class="size-btn" data-size="1000">1 KB</button>
+                            <button class="size-btn" data-size="10000">10 KB</button>
+                            <button class="size-btn" data-size="50000">50 KB</button>
+                            <button class="size-btn" data-size="100000">100 KB</button>
+                            <button class="size-btn" data-size="150000">150 KB</button>
+                            <button class="size-btn size-btn-limit" data-size="1048576">1 MiB (Max)</button>
+                            <button class="size-btn size-btn-danger" data-size="1048577">1 MiB + 1 (Exceeds)</button>
+                            <button class="size-btn active" data-size="custom">Custom</button>
+                        </div>
+                    </div>
+                    <div class="custom-size">
+                        <input type="number" id="customSize" value="5000" min="1" max="1000000" step="1000">
+                        <span class="unit">bytes</span>
+                    </div>
+                    <button id="sendTestBtn" class="btn btn-success btn-large" disabled>
+                        <i class="fas fa-rocket"></i> Send Test Message
+                    </button>
+                </div>
+
+                <div class="test-info">
+                    <div class="info-box">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Messages over ~32KB will be automatically fragmented by Chrome into multiple frames</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Messages Display -->
+        <section class="panel messages-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-exchange-alt"></i> Messages</h2>
+                <button id="clearMessages" class="btn-icon"><i class="fas fa-trash"></i></button>
+            </div>
+            <div class="panel-body">
+                <div id="messagesDisplay" class="messages-display">
+                    <div class="empty-state">
+                        <i class="fas fa-comments"></i>
+                        <p>No messages yet. Send a test message to begin.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Fragmentation Analyzer -->
+        <section class="panel analyzer-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-microscope"></i> Fragmentation Analyzer</h2>
+                <button id="clearAnalyzer" class="btn-icon"><i class="fas fa-trash"></i></button>
+            </div>
+            <div class="panel-body">
+                <div id="fragmentationResults" class="fragmentation-results">
+                    <div class="empty-state">
+                        <i class="fas fa-cube"></i>
+                        <p>Send a message to see fragmentation analysis</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Live Log -->
+        <section class="panel log-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-terminal"></i> Live Event Log</h2>
+                <button id="clearLog" class="btn-icon"><i class="fas fa-eraser"></i></button>
+            </div>
+            <div class="panel-body">
+                <div id="liveLog" class="live-log">
+                    <div class="log-entry log-info">
+                        <span class="log-time">--:--:--</span>
+                        <span class="log-message">Ready to connect...</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="tech-stack">
+                <span class="tech-tag"><i class="fas fa-server"></i> Node.js</span>
+                <span class="tech-tag"><i class="fas fa-network-wired"></i> TCP Sockets</span>
+                <span class="tech-tag"><i class="fas fa-code"></i> RFC 6455</span>
+                <span class="tech-tag"><i class="fas fa-shield-alt"></i> Custom Parser</span>
+            </div>
+            <p>Custom WebSocket Implementation • No External Libraries</p>
+        </div>
+    </footer>
+
+    <script src="demo-script.js"></script>
+</body>
+</html>
+

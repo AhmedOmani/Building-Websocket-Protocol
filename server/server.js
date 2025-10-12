@@ -22,7 +22,6 @@ CONSTANTS.CUSTOME_ERRORS.forEach(error => {
 });
 
 server.on("upgrade" , (req , socket , head) => {
-    console.log("Con:"  , req.headers["connection"] )
     //Grap required request headers.
     const hasWebsocketUpgradeHeader = req.headers["upgrade"].toLowerCase() === CONSTANTS.UPGRADE; // websocket
     // I do it specifically for compatibility issues in goolge chrome the connection header sent like this
@@ -48,30 +47,33 @@ server.on("upgrade" , (req , socket , head) => {
 });
 
 function startWebSocketCommunication(socket) {
-    console.log("Websocket Handshake Established Successfully.");
+    console.log("\n" + "=".repeat(60));
+    console.log("[HANDSHAKE] WebSocket connection established successfully");
+    console.log("[READY] Listening for incoming messages...");
+    console.log("=".repeat(60) + "\n");
 
     //Create receiver object to manage the data buffer.
     const receiver = new WebsocketReceiver(socket);
 
     socket.on("data" , (chunk) => {
-        console.log("chunk received.");
+        console.log(`[DATA] Received chunk: ${chunk.length} bytes`);
         receiver.processBuffer(chunk);
     });
 
     socket.on("end" , () => {
-        console.log("TRANSMISSION END: the websocket connection is closed.");
+        console.log("\n[DISCONNECT] Client closed the connection gracefully");
     });
 
     socket.on("error" , (err) => {
-        console.error("Socket error:", err.code || err.message);
+        console.error("[ERROR] Socket error:", err.code || err.message);
         // Don't crash the server on client disconnects
         if (err.code === "ECONNRESET" || err.code === "EPIPE") {
-            console.log("Client disconnected abruptly");
+            console.log("[INFO] Client disconnected abruptly");
         }
     });
 
     socket.on("close" , (hadError) => {
-        console.log(`Socket closed${hadError ? " with error" : " cleanly"}`);
+        console.log(`[CLOSED] Connection terminated${hadError ? " (with error)" : " (clean)"}\n`);
     });
 };
 

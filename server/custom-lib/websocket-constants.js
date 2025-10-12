@@ -17,6 +17,7 @@ module.exports = {
         "http://127.0.0.1:3000",
         "http:localhost:5500",
         "http://127.0.0.1:5500",
+        "http://127.0.0.1:5501",
         "ws://127.0.0.1:8080",
         "null" // This allow me to use the file protocol to view my html and establish a ws connection.
     ],
@@ -27,6 +28,7 @@ module.exports = {
     GET_MASK_KEY: 3,
     GET_PAYLOAD: 4,
     RESPONSE_MESSAGE: 5,
+    GET_CLOSE_INFO: 6,
     //Websocket rules.
     FIRST_FRAME_SIZE: 2, //size in bytes -> refer to image.png
 
