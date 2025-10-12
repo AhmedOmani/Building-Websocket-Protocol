@@ -19,6 +19,7 @@ module.exports = {
         "http://127.0.0.1:5500",
         "http://127.0.0.1:5501",
         "ws://127.0.0.1:8080",
+        "https://omani-websocket-protocol.onrender.com", // Deployment URL
         "null" // This allow me to use the file protocol to view my html and establish a ws connection.
     ],
     GUID: "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
