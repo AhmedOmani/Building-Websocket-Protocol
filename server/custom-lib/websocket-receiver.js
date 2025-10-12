@@ -223,9 +223,35 @@ class WebsocketReceiver {
         fullMessage.copy(frame , messageStartOffset);
 
         //send the message back to the client
-        this._socket.write(frame);
-        console.log("CLIENT...");
-        this._fragments = [];
+        this._sendFrame(frame);
+    }
+
+    _sendFrame(frame) {
+        // Check if socket is still writable
+        if (!this._socket || this._socket.destroyed || !this._socket.writable) {
+            console.log("Socket is not writable, cannot send frame");
+            this.reset();
+            return;
+        }
+
+        // Try to write the frame
+        const canContinue = this._socket.write(frame, (err) => {
+            if (err) {
+                console.error("Error writing frame:", err.message);
+                // Socket error occurred, clean up
+                this.reset();
+                return;
+            }
+            // Write successful, reset for next message
+            console.log("Frame sent successfully");
+            this.reset();
+        });
+
+        // If write buffer is full, we need to wait for drain
+        if (!canContinue) {
+            console.log("Socket buffer full, waiting for drain...");
+            // Note: The callback above will handle reset after drain+write completes
+        }
     }
 
     //Helper functions.
@@ -275,6 +301,24 @@ class WebsocketReceiver {
         }
         //Lets move to the next task.
         this._parserState = CONSTANTS.GET_MASK_KEY;
+    }
+
+    reset() {
+        /** reset the properties **/
+        this._bufferedChunks = [] 
+        this._totalBufferedLength = 0 ; 
+        this._parserState = CONSTANTS.GET_INFO;
+        this._shouldContinueParsing = false ;
+        this._isFinalFragment = false ; 
+        this._frameOpcode = null ; 
+        this._isPayloadMasked = false ; 
+        this._initialPayloadLength = 0 ; 
+        this._maskKey = Buffer.alloc(CONSTANTS.MASK_LENGTH) ; 
+        this._acualPayloadLength = 0 ;
+        this._maxPayload = 1024 * 1024;
+        this._totalPayloadLength = 0;
+        this._framesReceived = 0;
+        this._fragments = [];
     }
     
 };

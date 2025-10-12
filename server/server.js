@@ -59,7 +59,19 @@ function startWebSocketCommunication(socket) {
     });
 
     socket.on("end" , () => {
-        console.log("TRANSIMISION END: the we connection is closed.");
+        console.log("TRANSMISSION END: the websocket connection is closed.");
+    });
+
+    socket.on("error" , (err) => {
+        console.error("Socket error:", err.code || err.message);
+        // Don't crash the server on client disconnects
+        if (err.code === "ECONNRESET" || err.code === "EPIPE") {
+            console.log("Client disconnected abruptly");
+        }
+    });
+
+    socket.on("close" , (hadError) => {
+        console.log(`Socket closed${hadError ? " with error" : " cleanly"}`);
     });
 };
 
