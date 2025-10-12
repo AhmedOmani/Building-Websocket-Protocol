@@ -1,0 +1,22 @@
+{
+  "name": "omani-websocket-protocol",
+  "version": "1.0.0",
+  "description": "Custom WebSocket Protocol Implementation - RFC 6455 Compliant",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node server/server.js"
+  },
+  "keywords": [
+    "websocket",
+    "protocol",
+    "rfc6455",
+    "custom",
+    "nodejs"
+  ],
+  "author": "Omani",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

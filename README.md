@@ -1,28 +1,86 @@
-# Building WebSocket Protocol
+# Omani WebSocket Protocol
 
-This is an educational project demonstrating the basics of building a WebSocket protocol from scratch using Node.js. The project is designed to help learners understand how WebSocket communication works at a low level, including protocol constants, methods, and server implementation.
-
+A custom WebSocket protocol implementation built from scratch without external libraries, fully compliant with RFC 6455.
 
 ## Features
-- Custom implementation of WebSocket protocol basics
-- Educational code structure for easy learning
-- Simple client-server communication
 
-## Getting Started
+- **Custom Implementation**: Built from scratch without external WebSocket libraries
+- **RFC 6455 Compliant**: Full adherence to WebSocket protocol specification
+- **Fragmentation Handling**: Properly handles message fragmentation across multiple frames
+- **Real-time Demo**: Interactive dashboard showing WebSocket communication
+- **Professional UI**: Clean, modern interface for demonstrations
 
-1. **Install Node.js** (if not already installed)
-2. Navigate to the `server` directory:
-   ```bash
-   cd server
-   ```
-3. Run the server:
-   ```bash
-   node server.js
-   ```
-4. Open `index.html` in your browser to connect to the server.
+## Architecture
 
-## Educational Goals
-- Learn how WebSocket handshakes work
-- Understand message framing and protocol constants
-- Explore basic client-server communication using WebSockets
+```
+server/
+├── custom-lib/
+│   ├── websocket-constants.js    # Protocol constants
+│   ├── websocket-methods.js      # Utility methods
+│   └── websocket-receiver.js     # Frame parser and handler
+└── server.js                     # Main server
+
+client/
+├── demo.html                     # Demo interface
+├── demo-styles.css              # Styling
+└── demo-script.js               # Client-side logic
+```
+
+## Quick Start
+
+### Local Development
+
+1. **Clone and install**:
+```bash
+git clone <your-repo>
+cd Building-Websocket-Protocol
+npm install  # (if needed)
+```
+
+2. **Start server**:
+```bash
+npm start
+# Server runs on http://localhost:3001
+```
+
+3. **Open demo**:
+   - Open `client/demo.html` in your browser
+   - Click "Connect" to establish WebSocket connection
+   - Test different message sizes and fragmentation
+
+### Deployment
+
+
+## Demo Features
+
+- **Connection Management**: Real-time connection status
+- **Message Testing**: Send messages of various sizes (1KB to 1MB+)
+- **Fragmentation Analysis**: Visual breakdown of frame handling
+- **Live Statistics**: Real-time metrics and frame counts
+- **Message History**: Complete log of sent/received messages
+
+## Protocol Implementation
+
+### Frame Structure
+- **FIN Bit**: Handles message fragmentation
+- **OPCODE**: Text, Binary, Close, Ping, Pong support
+- **Masking**: Client-to-server message masking (RFC requirement)
+- **Payload Length**: Variable length encoding (125B, 64KB, 16MB)
+
+### Fragmentation
+- Automatic handling of multi-frame messages
+- Proper opcode preservation across fragments
+- Memory-efficient buffer management
+
+### Error Handling
+- Graceful connection closure
+- Proper close codes and reasons
+- Backpressure management
+
+## Technical Details
+
+- **Language**: Node.js (JavaScript)
+- **Protocol**: WebSocket (RFC 6455)
+- **Transport**: TCP sockets
+- **No External Dependencies**: Pure Node.js implementation
 
