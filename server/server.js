@@ -7,46 +7,44 @@ const METHODS = require("./custom-lib/websocket-methods");
 const { WebsocketReceiver } = require("./custom-lib/websocket-receiver");
 
 const server = http.createServer((req , res) => {
-    // Serve the demo page
-    if (req.url === '/' || req.url === '/demo') {
+    // Serve the demo page with inline CSS and JS
+    if (req.url === '/') {
         const demoPath = path.join(__dirname, '../client/demo.html');
         const cssPath = path.join(__dirname, '../client/demo-styles.css');
         const jsPath = path.join(__dirname, '../client/demo-script.js');
         
-        if (req.url === '/') {
-
-            fs.readFile(demoPath, (err, data) => {
-                if (err) {
-                    res.writeHead(404);
-                    res.end('Demo not found');
-                    return;
-                }
-                res.writeHead(200, { 'Content-Type': 'text/html' });
-                res.end(data);
-            });
-        } else if (req.url === '/demo-styles.css') {
+        // Read all three files
+        fs.readFile(demoPath, 'utf8', (err, htmlData) => {
+            if (err) {
+                res.writeHead(404);
+                res.end('Demo not found');
+                return;
+            }
             
-            fs.readFile(cssPath, (err, data) => {
+            fs.readFile(cssPath, 'utf8', (err, cssData) => {
                 if (err) {
                     res.writeHead(404);
                     res.end('CSS not found');
                     return;
                 }
-                res.writeHead(200, { 'Content-Type': 'text/css' });
-                res.end(data);
+                
+                fs.readFile(jsPath, 'utf8', (err, jsData) => {
+                    if (err) {
+                        res.writeHead(404);
+                        res.end('JS not found');
+                        return;
+                    }
+                    
+                    // Replace external references with inline content
+                    let finalHtml = htmlData
+                        .replace('<link rel="stylesheet" href="demo-styles.css">', `<style>${cssData}</style>`)
+                        .replace('<script src="demo-script.js"></script>', `<script>${jsData}</script>`);
+                    
+                    res.writeHead(200, { 'Content-Type': 'text/html' });
+                    res.end(finalHtml);
+                });
             });
-        } else if (req.url === '/demo-script.js') {
-            // Serve JS
-            fs.readFile(jsPath, (err, data) => {
-                if (err) {
-                    res.writeHead(404);
-                    res.end('JS not found');
-                    return;
-                }
-                res.writeHead(200, { 'Content-Type': 'application/javascript' });
-                res.end(data);
-            });
-        }
+        });
     } else {
         res.write("Hola from potential websocket server\n");
         res.end();
