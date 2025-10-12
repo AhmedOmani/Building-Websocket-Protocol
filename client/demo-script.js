@@ -198,8 +198,10 @@ function estimateFrames(size) {
 
 // WebSocket Functions
 function connect() {
-    addLog('Connecting to ws://127.0.0.1:3001...', 'info');
-    ws = new WebSocket('ws://127.0.0.1:3001');
+    // Use the same host as the current page, but with WebSocket protocol
+    const wsUrl = `wss://${window.location.host}`;
+    addLog(`Connecting to ${wsUrl}...`, 'info');
+    ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
         updateStatus(true);
