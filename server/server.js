@@ -1,12 +1,56 @@
 const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const CONSTANTS = require("./custom-lib/websocket-constants"); 
 const METHODS = require("./custom-lib/websocket-methods");
 const { WebsocketReceiver } = require("./custom-lib/websocket-receiver");
 
 const server = http.createServer((req , res) => {
-    res.write("Hola from potential websocket server\n");
-    res.end();
+    // Serve the demo page
+    if (req.url === '/' || req.url === '/demo') {
+        const demoPath = path.join(__dirname, '../client/demo.html');
+        const cssPath = path.join(__dirname, '../client/demo-styles.css');
+        const jsPath = path.join(__dirname, '../client/demo-script.js');
+        
+        if (req.url === '/') {
+
+            fs.readFile(demoPath, (err, data) => {
+                if (err) {
+                    res.writeHead(404);
+                    res.end('Demo not found');
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.end(data);
+            });
+        } else if (req.url === '/demo-styles.css') {
+            
+            fs.readFile(cssPath, (err, data) => {
+                if (err) {
+                    res.writeHead(404);
+                    res.end('CSS not found');
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'text/css' });
+                res.end(data);
+            });
+        } else if (req.url === '/demo-script.js') {
+            // Serve JS
+            fs.readFile(jsPath, (err, data) => {
+                if (err) {
+                    res.writeHead(404);
+                    res.end('JS not found');
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'application/javascript' });
+                res.end(data);
+            });
+        }
+    } else {
+        res.write("Hola from potential websocket server\n");
+        res.end();
+    }
 });
 
 server.listen(CONSTANTS.PORT , CONSTANTS.HOST , () => {
