@@ -52,8 +52,7 @@ const server = http.createServer((req , res) => {
 });
 
 server.listen(CONSTANTS.PORT , CONSTANTS.HOST , () => {
-    console.log(`Server is up`);
-    console.log(server.address());
+    console.log(`Websocket Server is up`);
 });
 
 CONSTANTS.CUSTOME_ERRORS.forEach(error => {
@@ -77,6 +76,7 @@ server.on("upgrade" , (req , socket , head) => {
     
     //Check origin
     const clientOrigin = req.headers["origin"];
+    console.log(clientOrigin);
     const isOriginAllowed = METHODS.isOriginAllowed(clientOrigin);
     //Check the whole specefication
     if (METHODS.websocketHeadersRulesCheck(socket , hasWebsocketUpgradeHeader , hasUpgradeConnectionHeader, isRequestMethodGet , isOriginAllowed)) {

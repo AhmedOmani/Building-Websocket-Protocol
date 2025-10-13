@@ -198,8 +198,18 @@ function estimateFrames(size) {
 
 // WebSocket Functions
 function connect() {
-    // Use the same host as the current page, but with WebSocket protocol
-    const wsUrl = `wss://${window.location.host}`;
+    // Determine WebSocket URL based on environment
+    let wsUrl;
+    
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        wsUrl = 'ws://localhost:3001';
+    } else if (window.location.protocol === 'file:') {
+        wsUrl = 'ws://localhost:3001';
+    } else {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${protocol}//${window.location.host}`;
+    }
+    
     addLog(`Connecting to ${wsUrl}...`, 'info');
     ws = new WebSocket(wsUrl);
     
@@ -224,7 +234,7 @@ function connect() {
     };
     
     ws.onerror = (error) => {
-        addLog('✗ WebSocket error occurred', 'error');
+        addLog('WebSocket error occurred', 'error');
     };
     
     ws.onclose = (event) => {
