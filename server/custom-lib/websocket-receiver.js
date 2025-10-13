@@ -85,7 +85,7 @@ class WebsocketReceiver {
         this._isFinalFragment = !!(firstByte & (1 << 7)); // equivalent to (firstByte & 0b10000000) === 0b10000000.
         this._frameOpcode = (firstByte & ((1 << 4) - 1)); // Extracting the 4 bits of the opcode by ADNING the 4 bits with (1111) and get the value .
         this._isPayloadMasked = !!(secondByte & (1 << 7)); // Extracing the last bit of the second byte to know if the message masked or not.
-        this._initialPayloadLength = (secondByte & ( (1 << 7) - 1 ));
+        this._initialPayloadLength = (secondByte & ( (1 << 7) - 1 )); //Get the initial payload lenght (<= 125 small , 126 flag = meduim , 127 flag = large)
 
         // Continuation frames have Opcode = 0 , so I need to save the opcode from the first frame only/
         if (this._frameOpcode !== 0x00) {
